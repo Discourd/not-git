@@ -7,15 +7,67 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// public フォルダ内の静的ファイル（index.html など）を自動で配信する設定
-app.use(express.static(path.join(__dirname, 'public')));
-
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// 1. ページ保存用 API
+// 1. トップページ（これで「Cannot GET /」が解消されます）
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Simple Web Host</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        textarea { width: 100%; height: 150px; }
+        button { padding: 10px 20px; background: #0070f3; color: white; border: none; borderRadius: 5px; cursor: pointer; }
+      </style>
+    </head>
+    <body>
+      <h1>Simple Web Host</h1>
+      <p>サイトを作成・公開できます。</p>
+      <form id="siteForm">
+        <p>
+          <label>サイト名（半角英数字）:</label><br>
+          <input type="text" id="siteName" required placeholder="mypage">
+        </p>
+        <p>
+          <label>HTMLコード:</label><br>
+          <textarea id="htmlContent" required placeholder="<h1>Hello World</h1>"></textarea>
+        </p>
+        <button type="submit">公開する</button>
+      </form>
+
+      <script>
+        document.getElementById('siteForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const siteName = document.getElementById('siteName').value;
+          const htmlContent = document.getElementById('htmlContent').value;
+
+          const res = await fetch('/api/sites/' + siteName, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html: htmlContent })
+          });
+
+          if (res.ok) {
+            alert('公開されました！');
+            window.location.href = '/sites/' + siteName;
+          } else {
+            alert('エラーが発生しました。');
+          }
+        });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// 2. ページ保存 API
 app.post('/api/sites/:siteName', (req, res) => {
   const siteName = req.params.siteName.replace(/[^a-zA-Z0-9_-]/g, '');
   const { html } = req.body;
@@ -31,13 +83,13 @@ app.post('/api/sites/:siteName', (req, res) => {
   });
 });
 
-// 2. 作成されたサイトの表示
+// 3. 作成されたページの表示
 app.get('/sites/:siteName', (req, res) => {
   const siteName = req.params.siteName.replace(/[^a-zA-Z0-9_-]/g, '');
   const filePath = path.join(DATA_DIR, `${siteName}.html`);
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).send('<h1>404 Not Found</h1>');
+    return res.status(404).send('<h1>404 Not Found</h1><p>ページが存在しません。</p>');
   }
   res.sendFile(filePath);
 });
